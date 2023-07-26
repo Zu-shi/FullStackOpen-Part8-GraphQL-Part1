@@ -9,6 +9,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@apollo/server": "^4.8.1"
+    "@apollo/server": "^4.8.1",
+    "uuid": "^9.0.0"
   }
 }
