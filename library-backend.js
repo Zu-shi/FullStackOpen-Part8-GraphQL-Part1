@@ -98,9 +98,17 @@ let books = [
 */
 
 const typeDefs = `
+  type Book {
+    title: String!
+    published: Int!
+    author: String!
+    genres: [String!]!
+  }  
+
   type Query {
-    bookCount: Int 
+    bookCount: Int
     authorCount: Int 
+    allBooks: [Book!]!
   }
 `
 
@@ -117,7 +125,8 @@ const resolvers = {
         }
       })
       return counts
-    }
+    },
+    allBooks: () => books
   }
 }
 
