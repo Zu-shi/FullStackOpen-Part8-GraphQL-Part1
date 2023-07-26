@@ -98,17 +98,25 @@ let books = [
 */
 
 const typeDefs = `
-  type Book {
+  type Book 
+  {
     title: String!
     published: Int!
     author: String!
     genres: [String!]!
   }  
 
+  type Author 
+  {
+    name: String!
+    bookCount: Int!
+  }
+
   type Query {
     bookCount: Int
     authorCount: Int 
     allBooks: [Book!]!
+    allAuthors: [Author!]!
   }
 `
 
@@ -126,7 +134,26 @@ const resolvers = {
       })
       return counts
     },
-    allBooks: () => books
+    allBooks: () => books,
+    allAuthors: () => {
+      let authors = {}
+      books.forEach(book => {
+        if (authors[book.author] === undefined) {
+          authors[book.author] = 1
+        }
+        else {
+          authors[book.author] += 1
+        }
+      })
+
+      let results = []
+
+      for (const key in authors) {
+        results.push({ name: key, bookCount: authors[key] })
+      }
+
+      return results;
+    }
   }
 }
 
