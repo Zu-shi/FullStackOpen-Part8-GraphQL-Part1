@@ -126,8 +126,10 @@ const typeDefs = `
 
 const resolvers = {
   Query: {
-    bookCount: () => books.length,
+    bookCount: () => Book.find({}).then((res) => res.length),
     authorCount: () => {
+      console.log("authorCount")
+      /*
       let counts = 0;
       let authors = {}
       books.forEach(book => {
@@ -136,9 +138,23 @@ const resolvers = {
           counts += 1;
         }
       })
-      return counts
+      return counts*/
+      return Author.find({}).then((res) => res.length)
     },
     allBooks: (_, { author, genre }) => {
+      console.log("allBooks")
+      let conditions = {}
+      if (author) {
+        conditions["author"] == author
+      }
+
+      if (genre) {
+        // not implemented
+        // conditions[]
+      }
+
+      return Book.find(conditions).populate('author').then((res) => res)
+      /*
       if (!author && !genre) {
         return books; // If no authorName provided, return all books
       }
@@ -150,11 +166,15 @@ const resolvers = {
 
       if (genre) {
         result = result.filter(book => book.genres.indexOf(genre) != -1)
-      }
+      }*/
 
-      return result;
+      // return result;
     },
-    allAuthors: () => {
+    allAuthors: async () => {
+      console.log("allAuthors")
+      const books = await Book.find({})
+      const authors = await Author.find({})
+
       let tempAuthors = {}
       books.forEach(book => {
         if (tempAuthors[book.author] === undefined) {
@@ -182,30 +202,49 @@ const resolvers = {
     }
   },
   Mutation: {
-    addBook: (_, { title, author, published, genres }) => {
-      const book = { title, author, published, genres, id: uuid() }
-      books.push(book)
+    addBook: async (_, { title, author, published, genres }) => {
+      console.log("addBook")
+      try {
+        const authors = await Author.findOne({ name: author })
+        let newAuthor = {}
+        if (!authors) {
+          newAuthor = await new Author({ name: author }).save()
+        }
 
-      if (authors.filter((author) => { author.name === author }).length === 0) {
-        authors.push({
-          name: author,
-          id: uuid()
+        const book = new Book({
+          title: title,
+          author: authors ? authors._id : newAuthor._id,
+          published: published,
+          genres: genres
         })
+
+        await book.save()
+        return Book.findOne({ title: title }).populate('author')
+      }
+      catch (err) {
+        console.log(err)
+      }
+    },
+    editAuthor: async (_, { name, setBornTo }) => {
+      console.log("editAuthor")
+      const authors = await Author.findOne({ name: name })
+
+      if (!authors) { return null }
+      else {
+        authors.born = setBornTo;
+        return authors.save()
       }
 
-      return book
-    },
-    editAuthor: (_, { name, setBornTo }) => {
-      let result = null;
-      console.log("EditAuthor", name, setBornTo)
-      authors.forEach((author) => {
-        if (author.name === name) {
-          author.born = setBornTo
-          result = author
-        }
-      })
-      console.log(authors)
-      return result;
+      // let result = null;
+      // console.log("EditAuthor", name, setBornTo)
+      // authors.forEach((author) => {
+      //   if (author.name === name) {
+      //     author.born = setBornTo
+      //     result = author
+      //   }
+      // })
+      // console.log(authors)
+      // return result;
     }
   }
 }
