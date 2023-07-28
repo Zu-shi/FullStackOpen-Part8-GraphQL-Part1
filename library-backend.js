@@ -5,6 +5,7 @@ const mongoose = require('mongoose')
 const Book = require('./models/book')
 const Author = require('./models/author')
 const defautCollection = require('./defaultCollection')
+const { GraphQLError } = require('graphql');
 
 require('dotenv').config()
 
@@ -223,6 +224,13 @@ const resolvers = {
       }
       catch (err) {
         console.log(err)
+        throw new GraphQLError('Add book failed', {
+          extensions: {
+            code: 'BAD_USER_INPUT',
+            invalidArgs: title,
+            err
+          }
+        })
       }
     },
     editAuthor: async (_, { name, setBornTo }) => {
@@ -232,7 +240,18 @@ const resolvers = {
       if (!authors) { return null }
       else {
         authors.born = setBornTo;
-        return authors.save()
+        try {
+          return authors.save()
+        }
+        catch {
+          throw new GraphQLError('Edit author failed', {
+            extensions: {
+              code: 'BAD_USER_INPUT',
+              invalidArgs: setBornTo,
+              err
+            }
+          })
+        }
       }
 
       // let result = null;
