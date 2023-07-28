@@ -1,98 +1,87 @@
 const { ApolloServer } = require('@apollo/server')
 const { startStandaloneServer } = require('@apollo/server/standalone')
 const { v1: uuid } = require('uuid')
+const mongoose = require('mongoose')
+const Book = require('./models/book')
+const Author = require('./models/author')
+const defautCollection = require('./defaultCollection')
 
-let authors = [
-  {
-    name: 'Robert Martin',
-    id: "afa51ab0-344d-11e9-a414-719c6709cf3e",
-    born: 1952,
-  },
-  {
-    name: 'Martin Fowler',
-    id: "afa5b6f0-344d-11e9-a414-719c6709cf3e",
-    born: 1963
-  },
-  {
-    name: 'Fyodor Dostoevsky',
-    id: "afa5b6f1-344d-11e9-a414-719c6709cf3e",
-    born: 1821
-  },
-  {
-    name: 'Joshua Kerievsky', // birthyear not known
-    id: "afa5b6f2-344d-11e9-a414-719c6709cf3e",
-  },
-  {
-    name: 'Sandi Metz', // birthyear not known
-    id: "afa5b6f3-344d-11e9-a414-719c6709cf3e",
-  },
-]
+require('dotenv').config()
 
-/*
- * Suomi:
- * Saattaisi olla järkevämpää assosioida kirja ja sen tekijä tallettamalla kirjan yhteyteen tekijän nimen sijaan tekijän id
- * Yksinkertaisuuden vuoksi tallennamme kuitenkin kirjan yhteyteen tekijän nimen
- *
- * English:
- * It might make more sense to associate a book with its author by storing the author's id in the context of the book instead of the author's name
- * However, for simplicity, we will store the author's name in connection with the book
- *
- * Spanish:
- * Podría tener más sentido asociar un libro con su autor almacenando la id del autor en el contexto del libro en lugar del nombre del autor
- * Sin embargo, por simplicidad, almacenaremos el nombre del autor en conección con el libro
-*/
+const CONNECTION_STRING = process.env.MONGODB_URI
 
-let books = [
-  {
-    title: 'Clean Code',
-    published: 2008,
-    author: 'Robert Martin',
-    id: "afa5b6f4-344d-11e9-a414-719c6709cf3e",
-    genres: ['refactoring']
-  },
-  {
-    title: 'Agile software development',
-    published: 2002,
-    author: 'Robert Martin',
-    id: "afa5b6f5-344d-11e9-a414-719c6709cf3e",
-    genres: ['agile', 'patterns', 'design']
-  },
-  {
-    title: 'Refactoring, edition 2',
-    published: 2018,
-    author: 'Martin Fowler',
-    id: "afa5de00-344d-11e9-a414-719c6709cf3e",
-    genres: ['refactoring']
-  },
-  {
-    title: 'Refactoring to patterns',
-    published: 2008,
-    author: 'Joshua Kerievsky',
-    id: "afa5de01-344d-11e9-a414-719c6709cf3e",
-    genres: ['refactoring', 'patterns']
-  },
-  {
-    title: 'Practical Object-Oriented Design, An Agile Primer Using Ruby',
-    published: 2012,
-    author: 'Sandi Metz',
-    id: "afa5de02-344d-11e9-a414-719c6709cf3e",
-    genres: ['refactoring', 'design']
-  },
-  {
-    title: 'Crime and punishment',
-    published: 1866,
-    author: 'Fyodor Dostoevsky',
-    id: "afa5de03-344d-11e9-a414-719c6709cf3e",
-    genres: ['classic', 'crime']
-  },
-  {
-    title: 'The Demon ',
-    published: 1872,
-    author: 'Fyodor Dostoevsky',
-    id: "afa5de04-344d-11e9-a414-719c6709cf3e",
-    genres: ['classic', 'revolution']
-  },
-]
+async function isDatabaseEmpty() {
+  const collectionNames = await mongoose.connection.db.listCollections().toArray();
+
+  for (let i = 0; i < collectionNames.length; i++) {
+    const collectionName = collectionNames[i].name;
+    const count = await mongoose.connection.db.collection(collectionName).countDocuments();
+
+    if (count > 0) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+// usage
+async function populateDatabase() {
+  const isEmpty = await isDatabaseEmpty()
+
+  console.log(`Is the database empty? ${isEmpty}`);
+
+  if (isEmpty) {
+    // insert default collections
+    for (const authorJson of defautCollection.authors) {
+      console.log(authorJson)
+      const a = new Author({
+        name: authorJson.name,
+        born: authorJson.born
+      })
+
+      try {
+        await a.save()
+        console.log("test")
+        console.log(models);
+      } catch (err) {
+        console.log("test2")
+        console.log(err);
+      };
+    }
+
+    for (const bookJson of defautCollection.books) {
+      try {
+        const a = await Author.findOne({ name: bookJson.author })
+
+        console.log("searching for")
+        console.log(bookJson)
+        console.log(a)
+
+        const b = new Book({
+          title: bookJson.title,
+          published: bookJson.published,
+          author: a._id,
+          genres: bookJson.genres
+        })
+
+        const res = await b.save()
+        console.log(res);
+
+      } catch (err) {
+        if (err) {
+          console.log(err);
+        } else if (author) {
+          console.log(author);
+        } else {
+          console.log('No author with that name has been found.');
+        }
+        return author;
+      }
+    }
+  }
+}
+
 
 /*
   you can remove the placeholder query once your first own has been implemented 
@@ -103,7 +92,7 @@ const typeDefs = `
   {
     title: String!
     published: Int!
-    author: String!
+    author: Author!
     genres: [String!]!
   }  
 
@@ -111,7 +100,6 @@ const typeDefs = `
   {
     name: String!
     born: Int
-    bookCount: Int!
   }
 
   type Query {
@@ -167,21 +155,28 @@ const resolvers = {
       return result;
     },
     allAuthors: () => {
-      let authors = {}
+      let tempAuthors = {}
       books.forEach(book => {
-        if (authors[book.author] === undefined) {
-          authors[book.author] = 1
+        if (tempAuthors[book.author] === undefined) {
+          tempAuthors[book.author] = 1
         }
         else {
-          authors[book.author] += 1
+          tempAuthors[book.author] += 1
         }
       })
 
       let results = []
 
-      for (const key in authors) {
-        results.push({ name: key, bookCount: authors[key] })
+      authors.forEach((author) => {
+        console.log(author)
+        console.log(authors)
+        results.push({
+          name: author.name,
+          born: author.born,
+          bookCount: tempAuthors[author.name],
+        })
       }
+      )
 
       return results;
     }
@@ -202,6 +197,7 @@ const resolvers = {
     },
     editAuthor: (_, { name, setBornTo }) => {
       let result = null;
+      console.log("EditAuthor", name, setBornTo)
       authors.forEach((author) => {
         if (author.name === name) {
           author.born = setBornTo
@@ -221,6 +217,8 @@ const server = new ApolloServer({
 
 startStandaloneServer(server, {
   listen: { port: 4000 },
-}).then(({ url }) => {
+}).then(async ({ url }) => {
+  await mongoose.connect(CONNECTION_STRING)
+  await populateDatabase()
   console.log(`Server ready at ${url}`)
 })
