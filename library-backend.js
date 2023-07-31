@@ -8,6 +8,8 @@ const defautCollection = require('./defaultCollection')
 const { GraphQLError } = require('graphql');
 const User = require('./models/user')
 const jwt = require('jsonwebtoken')
+const { applyMiddleware } = require('graphql-middleware');
+const { makeExecutableSchema } = require('@graphql-tools/schema');
 
 require('dotenv').config()
 
@@ -117,7 +119,7 @@ const typeDefs = `
   type Mutation {
     addBook(
       title: String!
-      published: Int
+      published: Int!
       author: String!
       genres: [String!]!
     ): Book
@@ -217,8 +219,8 @@ const resolvers = {
       let results = []
 
       authors.forEach((author) => {
-        console.log(author)
-        console.log(authors)
+        // console.log(author)
+        // console.log(authors)
         results.push({
           name: author.name,
           born: author.born,
@@ -270,8 +272,9 @@ const resolvers = {
         })
       }
     },
-    editAuthor: async (_, { name, setBornTo }) => {
+    editAuthor: async (_, { name, setBornTo }, context) => {
       console.log("editAuthor")
+      console.log(name, setBornTo)
 
       if (!context.currentUser) {
         throw new GraphQLError('Add book failed', {
@@ -326,6 +329,7 @@ const resolvers = {
         })
     },
     login: async (root, args) => {
+      console.log("login", args)
       const user = await User.findOne({ username: args.username })
 
       if (!user || args.password !== 'secret') {
@@ -346,20 +350,50 @@ const resolvers = {
   }
 }
 
+const loggerMiddleware = async (resolve, root, args, context, info) => {
+  // Log the input to the resolver
+  console.log(`Input: ${JSON.stringify(args)}`);
+
+  // Call the resolver
+  const result = await resolve(root, args, context, info);
+
+  // Log the output from the resolver
+  console.log(`Output: ${JSON.stringify(result)}`);
+
+  return result;
+};
+
+// Assuming `typeDefs` and `resolvers` are your type definitions and resolvers
+const schema = makeExecutableSchema({ typeDefs, resolvers });
+
+const schemaWithMiddleware = applyMiddleware(
+  schema,
+  loggerMiddleware
+);
+
 const server = new ApolloServer({
   typeDefs,
   resolvers,
+  // schema: schemaWithMiddleware,
+  debug: true,
+  formatError: (err) => {
+    console.log(err);
+    return err;
+  },
 })
 
 startStandaloneServer(server, {
   listen: { port: 4000 },
   context: async ({ req, res }) => {
     const auth = req ? req.headers.authorization : null
+    // console.log("req", req);
     if (auth && auth.startsWith('Bearer ')) {
+      // console.log("Test", req);
       const decodedToken = jwt.verify(
         auth.substring(7), process.env.JWT_SECRET
       )
       const currentUser = await User.findById(decodedToken.id)
+      if (currentUser) { console.log("Verified"); }
       return { currentUser }
     }
   }
