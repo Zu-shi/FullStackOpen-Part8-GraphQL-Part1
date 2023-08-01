@@ -111,8 +111,9 @@ const typeDefs = `
   type Query {
     bookCount: Int
     authorCount: Int 
-    allBooks(author: String, genre: String): [Book!]!
+    allBooks(author: String, genres: [String]): [Book!]!
     allAuthors: [Author!]!
+    allGenres: [String!]!
     me: User
   }
 
@@ -172,19 +173,24 @@ const resolvers = {
       return counts*/
       return Author.find({}).then((res) => res.length)
     },
-    allBooks: (_, { author, genre }) => {
+    allBooks: async (_, { author, genres }) => {
       console.log("allBooks")
+      console.log(genres)
       let conditions = {}
       if (author) {
         conditions["author"] == author
       }
 
-      if (genre) {
+      if (genres) {
+        conditions["genres"] = { $in: genres }
         // not implemented
         // conditions[]
       }
 
-      return Book.find(conditions).populate('author').then((res) => res)
+      console.log(conditions)
+      const b = await Book.find(conditions).populate('author').then((res) => res)
+      console.log(b)
+      return b
       /*
       if (!author && !genre) {
         return books; // If no authorName provided, return all books
@@ -200,6 +206,14 @@ const resolvers = {
       }*/
 
       // return result;
+    },
+    allGenres: async () => {
+      console.log("allGenres")
+      const genres = new Set()
+      const books = await Book.find({})
+      books.forEach((b) => b.genres.forEach((g) => genres.add(g)))
+      console.log(Array.from(genres))
+      return Array.from(genres);
     },
     allAuthors: async () => {
       console.log("allAuthors")
